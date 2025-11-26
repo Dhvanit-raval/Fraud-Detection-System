@@ -3,8 +3,8 @@ import cors from 'cors';
 import axios from 'axios';
 
 const app = express();
-const PORT = 5000;
-const ML_SERVICE_URL = 'http://localhost:8000';
+const PORT = process.env.PORT || 5000;
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 
 // Middleware
 app.use(cors());
@@ -50,13 +50,14 @@ app.post('/api/predict', async (req, res) => {
         }
 
         console.log('🔄 Calling ML service...');
+        console.log('🔗 ML Service URL:', ML_SERVICE_URL);
 
         let prediction;
 
         try {
-            // Try to call ML service
+            // Try to call ML service - UPDATED FOR RENDER
             const mlResponse = await axios.post(`${ML_SERVICE_URL}/predict`, transaction, {
-                timeout: 5000 // 5 second timeout
+                timeout: 10000 // 10 second timeout for Render
             });
 
             console.log('✅ ML service response:', mlResponse.data);
@@ -64,6 +65,7 @@ app.post('/api/predict', async (req, res) => {
 
         } catch (mlError) {
             console.log('⚠️ ML service unavailable, using fallback');
+            console.log('ML Error details:', mlError.message);
 
             // Fallback prediction when ML service is down
             prediction = generateFallbackPrediction(transaction);
@@ -262,7 +264,7 @@ app.get('/api/status', (req, res) => {
     });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Backend server running on http://localhost:${PORT}`);
     console.log(`🔗 ML Service: ${ML_SERVICE_URL}`);
     console.log(`📊 Endpoints:`);

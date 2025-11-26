@@ -1,0 +1,39 @@
+services:
+  # Backend (Node.js)
+  - type: web
+    name: fraud-detection-backend
+    env: node
+    plan: free
+    root: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ML_SERVICE_URL
+        value: https://fraud-detection-ml.onrender.com
+      - key: PORT
+        value: 10000
+
+  # ML Service (Python)
+  - type: web
+    name: fraud-detection-ml
+    env: python
+    plan: free
+    root: ml-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    envVars:
+      - key: PORT
+        value: 8000
+
+  # Frontend (React)
+  - type: web
+    name: fraud-detection-frontend
+    env: static
+    root: frontend
+    buildCommand: npm install && npm run build
+    publishDir: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://fraud-detection-backend.onrender.com
