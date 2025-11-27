@@ -15,8 +15,7 @@ services:
       - key: PORT
         value: 10000
 
-  # ML Service (Python)
-  - # ML Service (Python - Flask)
+  # ML Service (Python - Flask)
 - type: web
   name: fraud-detection-ml
   env: python
