@@ -43,8 +43,12 @@ const TransactionForm = (props) => {
 
             console.log('Sending transaction:', transactionData);
 
+            // FIXED: Use environment variable for API URL
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            console.log('Using API URL:', API_URL);
+
             // Send transaction to backend
-            const response = await fetch('http://localhost:5000/api/predict', {
+            const response = await fetch(`${API_URL}/api/predict`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -91,12 +95,14 @@ const TransactionForm = (props) => {
 
         } catch (error) {
             console.error('Failed to create transaction:', error);
-            alert(`❌ Error: ${error.message}\n\nPlease make sure:\n• Backend server is running on port 5000\n• ML service is running on port 8000\n• All services are properly started`);
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            alert(`❌ Error: ${error.message}\n\nPlease make sure:\n• Backend server is running at ${API_URL}\n• ML service is running\n• All services are properly started`);
         } finally {
             setLoading(false);
         }
     };
 
+    // ... rest of your code remains the same ...
     const handleChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
@@ -209,8 +215,8 @@ const TransactionForm = (props) => {
                                     type="button"
                                     onClick={() => handleChange('category', category.value)}
                                     className={`p-3 border-2 rounded-xl text-left transition-all duration-200 ${formData.category === category.value
-                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                                            : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                                         }`}
                                 >
                                     <div className="flex items-center justify-between mb-1">
@@ -277,8 +283,8 @@ const TransactionForm = (props) => {
                                     type="button"
                                     onClick={() => handleChange('device', device)}
                                     className={`p-3 border-2 rounded-xl text-center transition-all duration-200 ${formData.device === device
-                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                                            : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                                         }`}
                                 >
                                     <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">
