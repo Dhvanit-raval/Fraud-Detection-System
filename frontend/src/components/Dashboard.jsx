@@ -6,6 +6,8 @@ const Dashboard = () => {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
     useEffect(() => {
         fetchStats();
         fetchTransactions();
@@ -13,7 +15,7 @@ const Dashboard = () => {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/stats');
+            const response = await fetch(`${API_URL}/api/stats`);
             const data = await response.json();
             setStats(data.data);
         } catch (err) {
@@ -31,7 +33,7 @@ const Dashboard = () => {
 
     const fetchTransactions = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/transactions');
+            const response = await fetch(`${API_URL}/api/transactions`);
             const data = await response.json();
             setTransactions(data.data || []);
         } catch (err) {
@@ -196,7 +198,7 @@ const Dashboard = () => {
                                     </div>
                                 </div>
                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${transaction.prediction?.is_fraud ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
-                                        'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                                    'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                                     }`}>
                                     {transaction.prediction?.is_fraud ? 'FRAUD' : 'SAFE'}
                                 </span>

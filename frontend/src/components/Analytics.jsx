@@ -134,7 +134,7 @@ const Analytics = () => {
                         </div>
                         <div className="text-right">
                             <p className={`text-lg font-bold ${item.fraudRate > 10 ? 'text-red-600' :
-                                    item.fraudRate > 5 ? 'text-orange-600' : 'text-green-600'
+                                item.fraudRate > 5 ? 'text-orange-600' : 'text-green-600'
                                 }`}>
                                 {item.fraudRate}%
                             </p>

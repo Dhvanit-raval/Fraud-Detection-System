@@ -8,9 +8,11 @@ const Alerts = () => {
     const [priorityFilter, setPriorityFilter] = useState('all');
     const [autoRefresh, setAutoRefresh] = useState(true);
 
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
     const fetchAlerts = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/alerts');
+            const response = await fetch(`${API_URL}/api/alerts`);
             const data = await response.json();
 
             if (data.success) {
@@ -39,7 +41,7 @@ const Alerts = () => {
 
     const updateAlertStatus = async (alertId, status) => {
         try {
-            await fetch(`http://localhost:5000/api/alerts/${alertId}`, {
+            await fetch(`${API_URL}/api/alerts/${alertId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -230,7 +232,7 @@ const Alerts = () => {
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                     <div
                         className={`h-2 rounded-full transition-all duration-1000 ${alert.riskScore >= 80 ? 'bg-red-500' :
-                                alert.riskScore >= 60 ? 'bg-orange-500' : 'bg-yellow-500'
+                            alert.riskScore >= 60 ? 'bg-orange-500' : 'bg-yellow-500'
                             }`}
                         style={{ width: `${Math.min(alert.riskScore, 100)}%` }}
                     ></div>
@@ -265,8 +267,8 @@ const Alerts = () => {
                     <button
                         onClick={() => setAutoRefresh(!autoRefresh)}
                         className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-colors duration-200 ${autoRefresh
-                                ? 'bg-green-500 text-white hover:bg-green-600'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            ? 'bg-green-500 text-white hover:bg-green-600'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                             }`}
                     >
                         <RefreshCw className={`h-4 w-4 ${autoRefresh ? 'animate-spin' : ''}`} />

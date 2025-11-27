@@ -11,11 +11,13 @@ const Transactions = () => {
     const [statusFilter, setStatusFilter] = useState('all');
     const [dateFilter, setDateFilter] = useState('all');
 
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
     // Fetch transactions from backend
     const fetchTransactions = async () => {
         try {
             setLoading(true);
-            const response = await fetch('http://localhost:5000/api/transactions');
+            const response = await fetch(`${API_URL}/api/transactions`);
             const data = await response.json();
 
             if (data.success) {
