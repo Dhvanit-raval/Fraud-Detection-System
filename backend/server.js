@@ -1,42 +1,73 @@
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 
-// NUCLEAR CORS FIX - Allow everything
+// Fix for ES modules __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// CORS configuration
 app.use(cors());
 app.use(express.json());
 
-// Add manual CORS headers
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+// File storage setup
+const dataFile = path.join(__dirname, 'data.json');
 
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+// Load data from file
+function loadData() {
+    try {
+        if (fs.existsSync(dataFile)) {
+            const data = fs.readFileSync(dataFile, 'utf8');
+            console.log('📂 Loaded data from file');
+            return JSON.parse(data);
+        }
+    } catch (error) {
+        console.log('❌ Error loading data:', error.message);
     }
-    next();
-});
+    console.log('📂 Created new data file');
+    return { transactions: [], alerts: [] };
+}
 
-// Store transactions in memory
-let transactions = [];
-let alerts = [];
+// Save data to file
+function saveData() {
+    try {
+        fs.writeFileSync(dataFile, JSON.stringify({
+            transactions: transactions,
+            alerts: alerts
+        }, null, 2));
+        console.log('💾 Data saved to file');
+    } catch (error) {
+        console.log('❌ Error saving data:', error.message);
+    }
+}
+
+// Initialize data
+let { transactions, alerts } = loadData();
+
+// Auto-save every 30 seconds
+setInterval(saveData, 30000);
 
 // Routes
 app.get('/', (req, res) => {
     res.json({
-        message: 'Fraud Detection API - CORS FIXED',
+        message: 'Fraud Detection API - WITH PERSISTENT STORAGE',
         status: 'running',
+        transactionsCount: transactions.length,
+        alertsCount: alerts.length,
         timestamp: new Date().toISOString()
     });
 });
 
 // Get all transactions
 app.get('/api/transactions', (req, res) => {
+    console.log('📊 Sending transactions:', transactions.length);
     res.json({
         success: true,
         data: transactions,
@@ -46,6 +77,7 @@ app.get('/api/transactions', (req, res) => {
 
 // Get alerts
 app.get('/api/alerts', (req, res) => {
+    console.log('🚨 Sending alerts:', alerts.length);
     res.json({
         success: true,
         data: alerts,
@@ -61,17 +93,17 @@ app.get('/api/stats', (req, res) => {
     const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
     const activeAlerts = alerts.filter(a => a.status === 'new').length;
 
-    res.json({
-        success: true,
-        data: {
-            totalTransactions,
-            fraudTransactions,
-            highRiskTransactions,
-            totalAmount: Math.round(totalAmount * 100) / 100,
-            fraudRate: totalTransactions > 0 ? (fraudTransactions / totalTransactions * 100).toFixed(2) : 0,
-            activeAlerts
-        }
-    });
+    const stats = {
+        totalTransactions,
+        fraudTransactions,
+        highRiskTransactions,
+        totalAmount: Math.round(totalAmount * 100) / 100,
+        fraudRate: totalTransactions > 0 ? (fraudTransactions / totalTransactions * 100).toFixed(2) : 0,
+        activeAlerts
+    };
+
+    console.log('📈 Dashboard stats:', stats);
+    res.json({ success: true, data: stats });
 });
 
 // Predict fraud
@@ -106,7 +138,9 @@ app.post('/api/predict', async (req, res) => {
             id: Date.now().toString(),
             createdAt: new Date().toISOString()
         };
+
         transactions.unshift(transactionWithPrediction);
+        console.log('💾 Transaction stored. Total:', transactions.length);
 
         // Create alert if high risk
         if (prediction.risk_score > 70 || prediction.is_fraud) {
@@ -125,7 +159,11 @@ app.post('/api/predict', async (req, res) => {
                 reasons: prediction.reasons || ['High risk transaction detected']
             };
             alerts.unshift(alert);
+            console.log('🚨 Alert created:', alert.id);
         }
+
+        // Save to file immediately
+        saveData();
 
         res.json({
             success: true,
@@ -155,13 +193,16 @@ app.put('/api/alerts/:id', (req, res) => {
     alerts[alertIndex].status = status;
     alerts[alertIndex].updatedAt = new Date().toISOString();
 
+    saveData(); // Save changes
     res.json({ success: true, data: alerts[alertIndex] });
 });
 
-// Clear alerts (for testing)
-app.delete('/api/alerts', (req, res) => {
+// Clear all data (for testing)
+app.delete('/api/clear', (req, res) => {
+    transactions = [];
     alerts = [];
-    res.json({ success: true, message: 'All alerts cleared' });
+    saveData();
+    res.json({ success: true, message: 'All data cleared' });
 });
 
 // Fallback prediction
@@ -173,7 +214,7 @@ function generateFallbackPrediction(transaction) {
         risk_score += 0.3;
         reasons.push("High transaction amount");
     }
-    if (['gambling', 'electronics'].includes(transaction.category.toLowerCase())) {
+    if (['gambling', 'electronics'].includes(transaction.category?.toLowerCase())) {
         risk_score += 0.2;
         reasons.push("Risky merchant category");
     }
@@ -204,9 +245,10 @@ app.get('/health', (req, res) => {
     res.json({
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        services: {
-            backend: 'running',
-            ml_service: ML_SERVICE_URL
+        data: {
+            transactions: transactions.length,
+            alerts: alerts.length,
+            storage: 'file-based'
         }
     });
 });
@@ -214,5 +256,6 @@ app.get('/health', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Backend server running on port ${PORT}`);
     console.log(`🔗 ML Service: ${ML_SERVICE_URL}`);
-    console.log(`✅ CORS: Enabled for all origins`);
+    console.log(`💾 Storage: File-based (data.json)`);
+    console.log(`📊 Current data: ${transactions.length} transactions, ${alerts.length} alerts`);
 });
