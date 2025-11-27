@@ -6,23 +6,21 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 
-// FIXED CORS Configuration
-app.use(cors({
-    origin: [
-        'https://fraud-detection-frontend.onrender.com',
-        'https://fraud-detection-system-2.onrender.com', // Your actual frontend URL
-        'http://localhost:5173'
-    ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
-}));
-
-// Handle preflight requests
-app.options('*', cors());
-
-// The rest of your existing code remains the same...
+// NUCLEAR CORS FIX - Allow everything
+app.use(cors());
 app.use(express.json());
+
+// Add manual CORS headers
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    next();
+});
 
 // Store transactions in memory
 let transactions = [];
@@ -31,9 +29,9 @@ let alerts = [];
 // Routes
 app.get('/', (req, res) => {
     res.json({
-        message: 'Fraud Detection API',
+        message: 'Fraud Detection API - CORS FIXED',
         status: 'running',
-        endpoints: ['/api/transactions', '/api/predict', '/api/alerts', '/api/stats']
+        timestamp: new Date().toISOString()
     });
 });
 
@@ -46,34 +44,8 @@ app.get('/api/transactions', (req, res) => {
     });
 });
 
-// Add the missing /api/stats endpoint
-app.get('/api/stats', (req, res) => {
-    const totalTransactions = transactions.length;
-    const fraudTransactions = transactions.filter(t => t.prediction?.is_fraud).length;
-    const highRiskTransactions = transactions.filter(t => t.prediction?.risk_score > 70).length;
-    const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
-    const activeAlerts = alerts.filter(a => a.status === 'new').length;
-
-    const stats = {
-        totalTransactions,
-        fraudTransactions,
-        highRiskTransactions,
-        totalAmount: Math.round(totalAmount * 100) / 100,
-        fraudRate: totalTransactions > 0 ? (fraudTransactions / totalTransactions * 100).toFixed(2) : 0,
-        activeAlerts
-    };
-
-    console.log('📈 Dashboard stats:', stats);
-
-    res.json({
-        success: true,
-        data: stats
-    });
-});
-
-// Add the missing /api/alerts endpoint
+// Get alerts
 app.get('/api/alerts', (req, res) => {
-    console.log('📊 Sending alerts data. Total alerts:', alerts.length);
     res.json({
         success: true,
         data: alerts,
@@ -81,58 +53,63 @@ app.get('/api/alerts', (req, res) => {
     });
 });
 
-// Your existing /api/predict route remains the same...
+// Get stats
+app.get('/api/stats', (req, res) => {
+    const totalTransactions = transactions.length;
+    const fraudTransactions = transactions.filter(t => t.prediction?.is_fraud).length;
+    const highRiskTransactions = transactions.filter(t => t.prediction?.risk_score > 70).length;
+    const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
+    const activeAlerts = alerts.filter(a => a.status === 'new').length;
+
+    res.json({
+        success: true,
+        data: {
+            totalTransactions,
+            fraudTransactions,
+            highRiskTransactions,
+            totalAmount: Math.round(totalAmount * 100) / 100,
+            fraudRate: totalTransactions > 0 ? (fraudTransactions / totalTransactions * 100).toFixed(2) : 0,
+            activeAlerts
+        }
+    });
+});
+
+// Predict fraud
 app.post('/api/predict', async (req, res) => {
     console.log('📨 Received transaction:', req.body);
 
     try {
-        const transaction = req.body;
-
-        // Add timestamp if not present
-        if (!transaction.transaction_time) {
-            transaction.transaction_time = new Date().toISOString();
-        }
-
-        // Add transaction ID if not present
-        if (!transaction.transaction_id) {
-            transaction.transaction_id = `TXN${Date.now()}`;
-        }
-
-        console.log('🔄 Calling ML service...');
-        console.log('🔗 ML Service URL:', ML_SERVICE_URL);
+        const transaction = {
+            ...req.body,
+            transaction_time: req.body.transaction_time || new Date().toISOString(),
+            transaction_id: req.body.transaction_id || `TXN${Date.now()}`
+        };
 
         let prediction;
 
         try {
-            // Try to call ML service
+            // Call ML service
             const mlResponse = await axios.post(`${ML_SERVICE_URL}/predict`, transaction, {
                 timeout: 10000
             });
-
-            console.log('✅ ML service response:', mlResponse.data);
             prediction = mlResponse.data;
-
+            console.log('✅ ML service response:', prediction);
         } catch (mlError) {
-            console.log('⚠️ ML service unavailable, using fallback');
-            console.log('ML Error details:', mlError.message);
-
-            // Fallback prediction when ML service is down
+            console.log('⚠️ ML service down, using fallback');
             prediction = generateFallbackPrediction(transaction);
         }
 
-        // Store transaction with prediction
+        // Store transaction
         const transactionWithPrediction = {
             ...transaction,
             prediction,
             id: Date.now().toString(),
             createdAt: new Date().toISOString()
         };
-
         transactions.unshift(transactionWithPrediction);
 
-        // Create alert if high risk or fraud
+        // Create alert if high risk
         if (prediction.risk_score > 70 || prediction.is_fraud) {
-            console.log('🚨 Creating alert for high-risk transaction');
             const alert = {
                 id: `ALERT${Date.now()}`,
                 transactionId: transaction.transaction_id,
@@ -145,17 +122,9 @@ app.post('/api/predict', async (req, res) => {
                 device: transaction.device,
                 timestamp: new Date().toISOString(),
                 status: 'new',
-                reasons: prediction.reasons || ['High risk transaction detected'],
-                prediction: prediction
+                reasons: prediction.reasons || ['High risk transaction detected']
             };
             alerts.unshift(alert);
-            console.log('✅ Alert created:', {
-                id: alert.id,
-                merchant: alert.merchant,
-                amount: alert.amount,
-                riskScore: alert.riskScore,
-                is_fraud: prediction.is_fraud
-            });
         }
 
         res.json({
@@ -165,15 +134,85 @@ app.post('/api/predict', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Prediction error:', error.message);
+        console.error('❌ Prediction error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to process transaction',
-            details: error.message
+            error: 'Failed to process transaction'
         });
     }
 });
 
-// Your existing generateFallbackPrediction function and other routes...
+// Update alert status
+app.put('/api/alerts/:id', (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
 
-// Keep the rest of your existing code...
+    const alertIndex = alerts.findIndex(alert => alert.id === id);
+    if (alertIndex === -1) {
+        return res.status(404).json({ success: false, error: 'Alert not found' });
+    }
+
+    alerts[alertIndex].status = status;
+    alerts[alertIndex].updatedAt = new Date().toISOString();
+
+    res.json({ success: true, data: alerts[alertIndex] });
+});
+
+// Clear alerts (for testing)
+app.delete('/api/alerts', (req, res) => {
+    alerts = [];
+    res.json({ success: true, message: 'All alerts cleared' });
+});
+
+// Fallback prediction
+function generateFallbackPrediction(transaction) {
+    let risk_score = 0;
+    let reasons = [];
+
+    if (transaction.amount > 5000) {
+        risk_score += 0.3;
+        reasons.push("High transaction amount");
+    }
+    if (['gambling', 'electronics'].includes(transaction.category.toLowerCase())) {
+        risk_score += 0.2;
+        reasons.push("Risky merchant category");
+    }
+    if (transaction.country !== 'IN') {
+        risk_score += 0.3;
+        reasons.push("Foreign transaction");
+    }
+    if (transaction.device === 'mobile') {
+        risk_score += 0.1;
+        reasons.push("Mobile transaction");
+    }
+
+    risk_score += Math.random() * 0.2;
+    risk_score = Math.min(risk_score, 0.95);
+
+    return {
+        transaction_id: transaction.transaction_id,
+        is_fraud: risk_score > 0.5,
+        fraud_probability: risk_score,
+        risk_score: risk_score * 100,
+        reasons: reasons.length > 0 ? reasons : ["Low risk transaction"],
+        timestamp: new Date().toISOString()
+    };
+}
+
+// Health check
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        services: {
+            backend: 'running',
+            ml_service: ML_SERVICE_URL
+        }
+    });
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Backend server running on port ${PORT}`);
+    console.log(`🔗 ML Service: ${ML_SERVICE_URL}`);
+    console.log(`✅ CORS: Enabled for all origins`);
+});
