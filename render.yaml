@@ -15,17 +15,17 @@ services:
       - key: PORT
         value: 10000
 
-  # ML Service (Python - Flask)
-- type: web
-  name: fraud-detection-ml
-  env: python
-  plan: free
-  root: ml-service
-  buildCommand: pip install -r requirements.txt
-  startCommand: python app.py
-  envVars:
-    - key: PORT
-      value: 8000
+  # ML Service (Python)
+  - type: web
+    name: fraud-detection-ml
+    env: python
+    plan: free
+    root: ml-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PORT
+        value: 8000
 
   # Frontend (React)
   - type: web
@@ -33,7 +33,7 @@ services:
     env: static
     root: frontend
     buildCommand: npm install && npm run build
-    publishDir: frontend/dist
+    publishDir: ./dist
     envVars:
       - key: VITE_API_URL
-        value: https://fraud-detection-backend.onrender.com
+        value: https://fraud-detection-system-cki4.onrender.com
